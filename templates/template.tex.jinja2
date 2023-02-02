@@ -1,0 +1,73 @@
+{% macro render_line(article) %}
+    {%- set authors = article["authors"].split(', ') -%}
+    \item
+    {% for author in authors -%}
+        {%- if author in author_names -%}
+            \textbf{ {{- author -}} }
+        {%- else -%}
+            {{ author }}
+        {%- endif -%}
+        {%- if not loop.last -%}, {% endif -%}
+    {%- endfor %}. \textit{ {{- article["title"] | trim(".") -}} }, {{ article["journal_short"] }}. {{ article["year"] }}
+    {%- if article["volume"] is notnan -%} ;{{ article["volume"] }} {%- endif -%}
+    {%- if article["issue"] is notnan -%} ({{ article["issue"] }}) {%- endif -%}
+    {%- if article["pages"] is notnan -%} :{{ article["pages"] }}  {%- endif -%}
+    .
+    {%- if article["doi"] is notnan -%}
+        \studylink{ {{- article['doi'] -}} }
+    {%- endif -%}
+    {%- if article["jif"] is notnan -%}
+        \impact{ {{- article['jif_year'] -}} }{ {{- article['jif'] -}} }
+    {%- endif %}
+{% endmacro -%}
+
+\newcommand{\studylink}[1] {
+    DOI: \href{https://doi.org/#1}{% raw %}{{#1}}{% endraw %}
+}
+\newcommand{\impact}[2] {
+    \textbf{IF-#1: #2}
+}
+
+\subsection{Erst- und Letzt-Autorenschaften}
+
+\begin{enumerate}[nolistsep]
+\setlength\itemsep{1em}
+
+{% set articles = data | selectattr('is_first_or_last_author') | rejectattr("pubtype", "contains", "Published Erratum|Letter|Preprint") -%}
+{%- for article in articles -%}
+ {{ render_line(article) }}
+{%- endfor %}
+
+\end{enumerate}
+\vspace{0.1cm}
+
+{\footnotesize $\dagger$: gleichwertiger Beitrag}
+\vspace{0.1cm}
+
+{% set preprints = data | selectattr('pubtype', 'contains', 'Preprint') | list -%}
+{%- if preprints | count > 0 %}
+\subsection{Preprints}
+
+\begin{enumerate}[nolistsep]
+\setlength\itemsep{0.9em}
+
+{% for article in preprints -%}
+ {{ render_line(article) }}
+{%- endfor %}
+
+\end{enumerate}
+{%- endif %}
+
+\newpage
+
+\subsection{Co-Autorenschaften}
+
+\begin{enumerate}[nolistsep]
+\setlength\itemsep{0.9em}
+
+{% set articles = data | rejectattr('is_first_or_last_author') | rejectattr("pubtype", "contains", "Published Erratum|Letter|Preprint") -%}
+{%- for article in articles -%}
+ {{ render_line(article) }}
+{%- endfor %}
+
+\end{enumerate}

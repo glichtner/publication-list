@@ -2,7 +2,6 @@
 # coding: utf-8
 import os
 import re
-import textwrap
 from typing import Any, Literal
 
 import dotenv
@@ -11,10 +10,6 @@ import requests
 from tqdm import tqdm
 
 dotenv.load_dotenv()
-
-author_name = ["Lichtner G"]
-# author_name = ["von Dincklage F", "Von Dincklage Falk", "Dincklage FV", "Dincklage Falk", "Dincklage Falk V"]
-
 
 JCR_YEAR = 2021
 """ Year for which to fetch the JCR impact factor (should be the latest JCR edition """
@@ -31,11 +26,10 @@ API key for the Clarivate API
 
 Either add it here explicitly or add it to a .env file in the same directory as this script.
 You can get one here: https://clarivate.com/products/web-of-science-group/
-
 """
 
 MEDRXIV_API_URL = "https://api.medrxiv.org/details/medrxiv"
-""" API URL for the medRxiv preprint server"""
+""" API URL for the medRxiv preprint server """
 
 
 def fetch_pubmed_publications(
@@ -274,7 +268,7 @@ def fetch_publications_with_impact_factor(
         how="left",
     )
 
-    return df
+    return df.sort_values(by="year", ascending=False)
 
 
 def fetch_preprints(author_name: list[str], medrxiv_doi: list[str]) -> pd.DataFrame:
@@ -292,11 +286,8 @@ def fetch_preprints(author_name: list[str], medrxiv_doi: list[str]) -> pd.DataFr
 
         res_arxiv = r.json()["collection"][0]
         m = re.findall(r"(\w+), ([\w\. ]+)", res_arxiv["authors"])
-        authors = (
-            ", ".join(
-                [ms[0] + " " + ms[1].replace(".", "").replace(" ", "") for ms in m]
-            )
-            + "."
+        authors = ", ".join(
+            [ms[0] + " " + ms[1].replace(".", "").replace(" ", "") for ms in m]
         )
         res_medrxiv.append(
             {
@@ -304,7 +295,7 @@ def fetch_preprints(author_name: list[str], medrxiv_doi: list[str]) -> pd.DataFr
                 "authors": authors,
                 "pubdate": res_arxiv["date"],
                 "doi": doi,
-                "year": res_arxiv["date"][:4],
+                "year": int(res_arxiv["date"][:4]),
                 "source": res_arxiv["server"],
                 "pubtype": "Preprint",
             }
@@ -320,14 +311,14 @@ def fetch_preprints(author_name: list[str], medrxiv_doi: list[str]) -> pd.DataFr
     return df
 
 
-def format_latex(
+def render_template(
     df: pd.DataFrame,
     author_name: list[str],
     template_filename: str,
-    report_jif: Literal[False, "latest", "publication_date"] = "latest",
+    report_jif: Literal["latest", "publication_date"] = "latest",
 ) -> str:
     """
-    Format the dataframe into a LaTeX file using the given template
+    Render a template with publications.
 
     :param df: dataframe with publications
     :param author_name: list of author names
@@ -335,61 +326,12 @@ def format_latex(
     :param report_jif: whether to report JIF, and if so, which one
     :return: None
     """
-    from jinja2 import Environment, FileSystemLoader, select_autoescape
+    from jinja2 import Environment, PackageLoader, select_autoescape
 
     environment = Environment(
-        loader=FileSystemLoader("templates/"),
-        autoescape=select_autoescape(["html", "xml"]),
+        loader=PackageLoader("publication_list"),
+        autoescape=select_autoescape(),
     )
-    template = environment.get_template(template_filename)
-    template.render(
-        {
-            "author_name": author_name,
-            "first_last_author_publications": "--",
-            "preprints": None,
-            "coauthor_publications": "--",
-        }
-    )
-
-    def format_year_volume_issue_pages(
-        year: str, volume: str, issue: str, pages: str
-    ) -> str:
-        assert (
-            (not volume and not issue and not pages)
-            or (not issue and volume and pages)
-            or (volume and issue and pages)
-            or (volume and not issue and not pages)
-        ), f"volume: '{volume}', issue: '{issue}', pages: '{pages}'"
-
-        s = f"{year}"
-
-        if volume:
-            s += f";{volume}"
-        if issue:
-            s += f"({issue})"
-        if pages:
-            s += f":{pages}"
-
-        return f"{s}."
-
-    def row_to_string(row: pd.Series) -> str:
-        s = r"\item" + "\n"
-        s += row["authors"].replace(author_name, rf"\textbf{{{author_name}}}") + ". "
-        s += rf"\textit{{{row['title']}}}" + ", "
-        s += row["source"] + ". "
-        s += format_year_volume_issue_pages(
-            row["year"], row["volume"], row["issue"], row["pages"]
-        )
-
-        if not row["doi"] == "":
-            s += rf" \studylink{{{row['doi']}}}"
-
-        if not pd.isna(row[jif_column]) and not row[jif_column] == "":
-            s += rf" \impact{{{JCR_YEAR if jif_column == 'jif' else row['year']}}}{{{row[jif_column]}}}"
-
-        s += "\n\n"
-
-        return s
 
     if report_jif == "latest":
         jif_cols = [col for col in df.columns if re.match(r"jif_20\d\d", col)]
@@ -398,84 +340,58 @@ def format_latex(
         elif len(jif_cols) > 1:
             raise ValueError("Multiple JIF columns found in the dataframe")
         jif_column = jif_cols[0]
+        jif_year = jif_column.split("_")[1]
     elif report_jif == "publication_date":
         jif_column = "jif_pubyear"
-    elif not report_jif:
-        jif_column = None
+        jif_year = df["year"]
     else:
         raise ValueError(f"Unknown value for report_jif: {report_jif}")
 
-    s = textwrap.dedent(
-        r"""
-    \subsection{Erst- und Letzt-Autorenschaften}
+    environment.tests["contains"] = lambda string, pattern: re.search(pattern, string)
+    environment.tests["notnan"] = lambda x: not pd.isna(x)
 
-    \begin{enumerate}[nolistsep]
-    \setlength\itemsep{1em}
+    template = environment.get_template(template_filename)
 
-    """
+    columns = [
+        "journal_short",
+        "title",
+        "authors",
+        "doi",
+        "pubtype",
+        "year",
+        "volume",
+        "issue",
+        "pages",
+        "jif",
+        "jif_year",
+        "is_first_or_last_author",
+    ]
+
+    data = df.rename(columns={jif_column: "jif", "source": "journal_short"}).assign(
+        jif_year=jif_year
     )
 
-    for _, row in df.query("is_first_or_last_author").iterrows():
-        s += row_to_string(row)
+    data = data[columns].sort_values(by="year", ascending=False)
 
-    s += textwrap.dedent(
-        r"""
-    \end{enumerate}
-    \vspace{0.1cm}
-    {\footnotesize $\dagger$: gleichwertiger Beitrag}
-    \vspace{0.1cm}
-    """
+    return template.render(
+        data=data.to_dict(orient="records"), author_names=author_name
     )
-
-    df_preprints = df.query("pubtype == 'Preprint'")
-    if not df_preprints.empty:
-        s += textwrap.dedent(
-            r"""
-        \subsection{Preprints}
-        \begin{enumerate}[nolistsep]
-        \setlength\itemsep{0.9em}
-        """
-        )
-
-        for _, row in df_preprints.iterrows():
-            s += row_to_string(row)
-
-        s += textwrap.dedent(
-            r"""
-        \newpage
-
-        \end{enumerate}
-        """
-        )
-
-    s += textwrap.dedent(
-        r"""
-    \subsection{Co-Autorenschaften}
-
-    \begin{enumerate}[nolistsep]
-    \setlength\itemsep{0.9em}
-    """
-    )
-
-    for _, row in df.query("~is_first_or_last_author").iterrows():
-        s += row_to_string(row)
-
-    s += textwrap.dedent(
-        r"""
-    \end{enumerate}
-    """
-    )
-
-    return s
 
 
 if __name__ == "__main__":
     import argparse
     from pathlib import Path
 
-    parser = argparse.ArgumentParser(description="Fetch publication data for authors.")
+    parser = argparse.ArgumentParser(
+        description="Fetch publication data for authors from PubMed with Journal Impact Factor."
+    )
     parser.add_argument(
-        "-a", "--authors", nargs="+", type=str, help="List of author names"
+        "-a",
+        "--authors",
+        nargs="+",
+        type=str,
+        help="List of author names",
+        required=True,
     )
     parser.add_argument(
         "-y",
@@ -483,6 +399,7 @@ if __name__ == "__main__":
         dest="jcr_year",
         type=int,
         help="JCR year to use for JIF (apart from the respective publication years)",
+        required=True,
     )
     parser.add_argument(
         "-o",
@@ -492,20 +409,24 @@ if __name__ == "__main__":
         default="publication-list.csv",
     )
     parser.add_argument(
-        "--latex", action="store_true", help="Write publication list LaTeX file"
+        "--render-template",
+        dest="render_template",
+        action="store_true",
+        help="Render a publication list",
+        default=False,
     )
     parser.add_argument(
-        "--latex-template",
-        dest="latex_filename",
+        "--template-filename",
+        dest="template_filename",
         type=str,
-        default="latex-template.tex.j2",
-        help="Filename of latex template file",
+        default="template.tex.jinja2",
+        help="Name of template file to render",
     )
     parser.add_argument(
-        "--latex-jif-report",
-        dest="latex_jif_report",
-        choices=[False, "latest", "publication_date"],
-        help="Which JIF to report in latex file",
+        "--template-jif-report",
+        dest="template_jif_report",
+        choices=["latest", "publication_date"],
+        help="Which JIF to report in template file",
         default="latest",
     )
     parser.add_argument("--summary", action="store_true", help="Write JIF summary file")
@@ -520,32 +441,34 @@ if __name__ == "__main__":
 
     filename = Path(args.output)
 
-    df = fetch_publications_with_impact_factor(args.author_name, args.jcr_year)
+    df = fetch_publications_with_impact_factor(args.authors, args.jcr_year)
 
     if args.preprints:
         df_preprints = fetch_preprints(
-            medrxiv_doi=args.preprints, author_name=args.author_name
+            medrxiv_doi=args.preprints, author_name=args.authors
         )
         df = pd.concat([df, df_preprints], ignore_index=True).reset_index(drop=True)
 
     df.to_csv(filename, index=False)
 
-    if args.latex or args.summary:
+    if args.render_template or args.summary:
         idx_exclude = df["pubtype"].str.contains("Published Erratum|Letter")
-        print(f"Exluding {idx_exclude.sum()} articles for latex/summary:")
+        print(
+            f"Excluding {idx_exclude.sum()} articles for template rendering and summary:"
+        )
         print(df.loc[idx_exclude, ["source", "pubtype", "title"]])
         df = df[~idx_exclude]
 
-    if args.latex:
-        latex = format_latex(
+    if args.render_template:
+        rendered = render_template(
             df,
-            author_name=args.author_name,
-            report_jif=args.latex_jif_report,
-            template_filename=args.latex_filename,
+            author_name=args.authors,
+            report_jif=args.template_jif_report,
+            template_filename=args.template_filename,
         )
 
         with open(filename.with_suffix(".tex"), "w", encoding="utf-8") as f:
-            f.write(latex)
+            f.write(rendered)
 
     if args.summary:
         df_summary = df.groupby("is_first_or_last_author")[

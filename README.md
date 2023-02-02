@@ -2,18 +2,40 @@
 A python script that fetches all publications of an author from PubMed and adds journal impact factor of the latest Journal Citation Reports (JCR) edition and of the publication year.
 
 ## Requirements
-- Python 3.x with requests, tqdm, python-dotenv and pandas libraries
+- Python >=3.10 with requests, tqdm, python-dotenv and pandas libraries
+- Optionally jinja for rendering templates
 
 ## Installation
 Clone or download the repository and install the required libraries using pip:
 
-    pip install -r requirements.txt
+```bash
+pip install -r requirements.txt
+```
+
+### Clarivate API Key
+In order to fetch JCR Impact Factors, you will need an API key from Clarivate Analytics.
+
+Create a file named `.env` in the same directory as the script and add your Clarivate API key as follows:
+
+    CLARIVATE_API_KEY=<your_api_key>
+
+Replace `<your_api_key>` with your actual Clarivate API key. You can copy the `sample.env` file in the repository and rename it to `.env`. Replace the placeholder text in the `.env` file with your actual API key.
 
 ## Usage
 
 To run the script, use the following command:
 
-    python publication_list.py --authors "<author_name>" [<author_name_2>, ...] --jcr_year 2021
+```bash
+python publication_list.py [-h] \
+      -a AUTHORS [AUTHORS ...] \
+      -y JCR_YEAR \
+      [-o OUTPUT] \
+      [--render-template] \
+      [--template-filename TEMPLATE_FILENAME] \
+      [--template-jif-report {latest,publication_date}] \
+      [--summary] \
+      [--preprints [PREPRINTS ...]]
+```
 
 Replace `<author_name>` with the name of the author you want to fetch publications for.
 
@@ -28,43 +50,52 @@ The file will contain amongst others the following columns:
 - JCR Impact Factor (Publication Year)
 
 ### Arguments
-
-- `-a` / `--authors`: List of author names.
-- `-y` / `--jcr_year`: JCR year to use for JIF (apart from the respective publication years).
-- `-o` / `--output`: Output file name (default: `publication-list.csv`).
-- `--latex-template`: Write publication list to LaTeX template.
-- `--latex-jif-report`: Which JIF to report in latex file (default: `latest`).
-    - `False`: Do not report JIF in latex file.
-    - `latest`: Use JIF of the latest JCR edition.
-    - `publication_date`: Use JIF of the year of publication.
-- `--summary`: Write JIF summary file (descriptive statistics of author's JIFs).
-- `--preprints`: List of medRxiv DOIs to include in the publication list.
-
+```
+  -h, --help            show this help message and exit
+  -a AUTHORS [AUTHORS ...], --authors AUTHORS [AUTHORS ...]
+                        List of author names
+  -y JCR_YEAR, --jcr-year JCR_YEAR
+                        JCR year to use for JIF (apart from the respective publication years)
+  -o OUTPUT, --output OUTPUT
+                        Output file name (default: publication-list.csv)
+  --render-template     Render a publication list
+  --template-filename TEMPLATE_FILENAME
+                        Name of template file to render
+  --template-jif-report {latest,publication_date}
+                        Which JIF to report in template file
+  --summary             Write JIF summary file
+  --preprints [DOI ...]
+                        List of medRxiv DOIs to include in the publication list
+```
 
 ### Examples
 
 The following command will fetch publications of `Lichtner G` and `Lichtner Gregor` using JIF of 2021 and write the output to `custom_output.csv`. It will also write LaTeX file and JIF summary file:
 
-    python publication_list.py -a "Lichtner G" "Lichtner Gregor" -y 2021 -o "custom_output.csv" --latex latex-template.tex.jinja --summary
+```bash
+python publication_list.py \
+  -a "Lichtner G" "Lichtner Gregor" \
+  -y "2021" \
+  -o "custom_output.csv" \
+  --render-template \
+  --summary
+```
+
+The following command will fetch publications of `Lichtner G` sing JIF of 2021 and write the output
+to `output/publication-list.csv`. It will also render a latex file, output a summary and
+include preprints from medRxiv:
+
+```bash
+python publication_list.py \
+  -a "Lichtner G" \
+  -y 2021 \
+  -o "output/publication-list.csv" \
+  --render-template \
+  --summary \
+  --preprints "10.1101/2022.07.18.22277750" "10.1101/2022.05.12.22274089"
+```
 
 
-The following command will fetch publications of `Lichtner G` and `Lichtner Gregor` using JIF of 2021 and write the output to `custom_output.csv`. It will also include preprints from medRxiv:
-
-    python publication_list.py -a "Lichtner G" "Lichtner Gregor" -y 2021 -o "custom_output.csv" --preprints "10.1101/2021.01.01.21249673" "10.1101/2021.01.01.21249673"
-
-
-## Configuration
-In order to fetch JCR Impact Factors, you will need an API key from Clarivate Analytics.
-
-Create a file named `.env` in the same directory as the script and add your Clarivate API key as follows:
-
-    CLARIVATE_API_KEY=<your_api_key>
-
-Replace `<your_api_key>` with your actual Clarivate API key.
-
-You can copy the `sample.env` file in the repository and rename it to `.env`. Replace the placeholder text in the `.env` file with your actual API key.
-
-The script will read the API key from the `.env` file when it runs.
 
 
 ## Limitations

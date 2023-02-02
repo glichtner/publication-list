@@ -67,7 +67,6 @@ docs/_build
 
 *.whl
 
-
 .vscode/
 .settings/
 *.code-workspace
@@ -76,7 +75,8 @@ docs/_build
 .ipynb_checkpoints/
 notebooks/
 log/
-test.py
 .Rhistory
 *.sqlite
 *.ipynb
+output/
+test.py

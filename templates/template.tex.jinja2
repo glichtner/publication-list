@@ -9,23 +9,23 @@
         {%- endif -%}
         {%- if not loop.last -%}, {% endif -%}
     {%- endfor %}. \textit{ {{- article["title"] | trim(".") -}} }, {{ article["journal_short"] }}. {{ article["year"] }}
-    {%- if article["volume"] is notnan -%} ;{{ article["volume"] }} {%- endif -%}
-    {%- if article["issue"] is notnan -%} ({{ article["issue"] }}) {%- endif -%}
-    {%- if article["pages"] is notnan -%} :{{ article["pages"] }}  {%- endif -%}
+    {%- if article["volume"] is notempty -%} ;{{ article["volume"] }} {%- endif -%}
+    {%- if article["issue"] is notempty -%} ({{ article["issue"] }}) {%- endif -%}
+    {%- if article["pages"] is notempty -%} :{{ article["pages"] }}  {%- endif -%}
     .
-    {%- if article["doi"] is notnan -%}
+    {%- if article["doi"] is notempty -%}
         \studylink{ {{- article['doi'] -}} }
     {%- endif -%}
-    {%- if article["jif"] is notnan -%}
+    {%- if article["jif"] is notempty -%}
         \impact{ {{- article['jif_year'] -}} }{ {{- article['jif'] -}} }
     {%- endif %}
 {% endmacro -%}
 
 \newcommand{\studylink}[1] {
-    DOI: \href{https://doi.org/#1}{% raw %}{{#1}}{% endraw %}
+    DOI:~\href{https://doi.org/#1}{% raw %}{{#1}}{% endraw %}
 }
 \newcommand{\impact}[2] {
-    \textbf{IF-#1: #2}
+    \textbf{IF-#1:~#2}
 }
 
 \subsection{Erst- und Letzt-Autorenschaften}

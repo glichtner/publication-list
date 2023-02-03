@@ -348,7 +348,7 @@ def render_template(
         raise ValueError(f"Unknown value for report_jif: {report_jif}")
 
     environment.tests["contains"] = lambda string, pattern: re.search(pattern, string)
-    environment.tests["notnan"] = lambda x: not pd.isna(x)
+    environment.tests["notempty"] = lambda x: (not pd.isna(x)) & (not x == "")
 
     template = environment.get_template(template_filename)
 

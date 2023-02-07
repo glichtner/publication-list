@@ -60,9 +60,9 @@ The file will contain amongst others the following columns:
                         Output file name (default: publication-list.csv)
   --render-template     Render a publication list
   --template-filename TEMPLATE_FILENAME
-                        Name of template file to render
+                        Name of template file to render (default: templates/template.tex.jinja2)
   --template-jif-report {latest,publication_date}
-                        Which JIF to report in template file
+                        Which JIF to report in template file (default: latest)
   --summary             Write JIF summary file
   --preprints [DOI ...]
                         List of medRxiv DOIs to include in the publication list
@@ -81,7 +81,7 @@ python publication_list.py \
   --summary
 ```
 
-The following command will fetch publications of `Lichtner G` sing JIF of 2021 and write the output
+The following command will fetch publications of `Lichtner G` using JIF of 2021 and write the output
 to `output/publication-list.csv`. It will also render a latex file, output a summary and
 include preprints from medRxiv:
 
